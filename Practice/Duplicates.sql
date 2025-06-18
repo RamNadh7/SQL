@@ -36,11 +36,11 @@ having count(*)>1)
 ---- Using SELF JOIN
 delete from cars where id in
 (
-select c2.id
+select c2.*
 from cars c1
 join cars c2 on
 c1.model=c2.model and c1.brand=c2.brand
-where c1.id<c2.id)
+where c1.id>c2.id)
 
 
 ---- Window FUNCTION
