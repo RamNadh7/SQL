@@ -185,3 +185,9 @@ TOP 2
 
 
 */
+
+
+--- Static Values
+select 123;
+
+select 'hello' as greeting
