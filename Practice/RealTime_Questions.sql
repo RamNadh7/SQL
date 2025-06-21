@@ -68,7 +68,7 @@ LEFT JOIN Payments p ON o.order_id = p.order_id
 AND p.payment_date > NOW() - INTERVAL '30 DAY'
 WHERE p.order_id IS NULL;
 
-
+------------------------------------------------------------------------------------------------------------------------
 -- Sales Table
 CREATE TABLE Sales (
     sale_id INT PRIMARY KEY,
