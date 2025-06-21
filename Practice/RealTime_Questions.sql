@@ -258,4 +258,163 @@ HAVING COUNT(DISTINCT subject_id) < (
 
 
 ------------------------------------------------------------------------------------------
+CREATE TABLE Sales1 (
+    sale_id INT PRIMARY KEY,
+    employee_id INT,
+    sale_date DATE,
+    amount DECIMAL(10,2)
+);
 
+INSERT INTO Sales1 (sale_id, employee_id, sale_date, amount) VALUES
+(1, 101, '2024-08-15', 500.00),
+(2, 102, '2024-09-10', 750.00),
+(3, 103, '2024-11-20', 600.00),
+(4, 101, '2024-12-05', 800.00),
+(5, 102, '2025-01-18', 300.00),
+(6, 103, '2025-02-10', 400.00),
+(7, 101, '2025-03-25', 900.00),
+(8, 102, '2025-04-22', 1200.00),
+(9, 104, '2025-05-30', 1500.00),
+(10, 103, '2025-06-10', 700.00);
+
+/*
+Write a query to find the top 3 employees with the highest sales in the last year. 
+(PostgreSQL version)
+*/
+SELECT employee_id, SUM(amount) AS total_sales
+FROM Sales1
+WHERE sale_date >= CURRENT_DATE - INTERVAL '1 year'
+GROUP BY employee_id
+ORDER BY total_sales DESC
+LIMIT 3;
+
+
+--------------------------------------------------------------------------
+CREATE TABLE Sales2 (
+    sale_id INT PRIMARY KEY,
+    employee_id INT,
+    sale_date DATE,
+    amount DECIMAL(10,2)
+);
+
+INSERT INTO Sales2 (sale_id, employee_id, sale_date, amount) VALUES
+(1, 101, '2025-01-02', 500.00),
+(2, 102, '2025-01-08', 750.00),
+(3, 103, '2025-01-15', 600.00),
+(4, 104, '2025-02-01', 400.00),
+(5, 105, '2025-02-12', 300.00),
+(6, 106, '2025-03-01', 900.00),
+(7, 107, '2025-03-15', 1200.00),
+(8, 108, '2025-03-22', 1000.00),
+(9, 109, '2025-04-01', 450.00),
+(10, 110, '2025-04-12', 800.00);
+
+/*
+How would you write a query to find the 90th percentile of sales from a Sales table?
+*/
+SELECT PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY 
+amount) AS p90_sales 
+FROM Sales2; 
+
+-----------------------------------------------------------------------------------------------------
+CREATE TABLE Sales3 (
+    sale_id INT PRIMARY KEY,
+    customer_id INT,
+    amount DECIMAL(10,2)
+);
+
+
+INSERT INTO Sales3 (sale_id, customer_id, amount) VALUES
+(1, 101, 100.00),
+(2, 102, NULL),
+(3, 103, 250.00),
+(4, 104, NULL),
+(5, 105, 300.00);
+
+/*
+How can you write a query that sums the total sales but treats null values as zero? 
+*/
+
+SELECT SUM(COALESCE(amount, 0)) AS total_sales 
+FROM Sales3; 
+
+-------------------------------------------------------------------------------------
+CREATE TABLE Orders1 (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date TIMESTAMP,
+    delivery_date TIMESTAMP
+);
+
+INSERT INTO Orders1 (order_id, customer_id, order_date, delivery_date) VALUES
+(1, 101, '2025-05-01 10:00:00', '2025-05-03 16:30:00'),
+(2, 102, '2025-05-02 09:15:00', '2025-05-04 11:45:00'),
+(3, 103, '2025-05-03 14:00:00', '2025-05-05 17:20:00'),
+(4, 104, '2025-05-04 08:30:00', '2025-05-04 18:00:00'),
+(5, 105, '2025-05-05 12:00:00', '2025-05-08 10:15:00');
+
+/*
+Write a query to find the average time taken between order creation and delivery. 
+*/
+SELECT 
+    ROUND(AVG(EXTRACT(EPOCH FROM delivery_date - order_date) / 3600), 2) AS avg_delivery_time_hours
+FROM Orders1;
+
+
+-----------------------------------------------------------------------------------------------------
+CREATE TABLE Sales4 (
+    sale_id INT PRIMARY KEY,
+    sale_date DATE,
+    amount DECIMAL(10,2)
+);
+
+
+INSERT INTO Sales4 (sale_id, sale_date, amount) VALUES
+(1, '2025-01-15', 200.00),
+(2, '2025-01-28', 350.00),
+(3, '2025-02-10', 150.00),
+(4, '2025-03-05', 500.00),
+(5, '2025-03-15', 250.00),
+(6, '2025-04-01', 300.00),
+(7, '2025-06-20', 400.00),
+(8, '2025-08-14', 100.00),
+(9, '2025-08-28', 200.00),
+(10, '2025-11-11', 700.00);
+
+
+DO $$
+DECLARE
+    target_year INT := 2025;
+    dyn_query TEXT;
+BEGIN
+    dyn_query := 'SELECT TO_CHAR(sale_date, ''Month'') AS month, 
+                         SUM(amount) AS total_sales 
+                  FROM Sales4 
+                  WHERE EXTRACT(YEAR FROM sale_date) = ' || target_year || '
+                  GROUP BY 1 
+                  ORDER BY TO_DATE(month, ''Month'');';
+
+    EXECUTE dyn_query;
+END $$;
+
+DO $$
+DECLARE
+    target_year INT := 2025;
+    dyn_query TEXT;
+BEGIN
+    dyn_query := 'SELECT TO_CHAR(sale_date, ''Month'') AS month, 
+                         SUM(amount) AS total_sales 
+                  FROM Sales4 
+                  WHERE EXTRACT(YEAR FROM sale_date) = ' || target_year || '
+                  GROUP BY TO_CHAR(sale_date, ''Month'') 
+                  ORDER BY TO_DATE(TO_CHAR(sale_date, ''Month''), ''Month'');';
+
+    EXECUTE dyn_query;
+END $$;
+
+SELECT TO_CHAR(sale_date, 'Month') AS month, 
+       SUM(amount) AS total_sales
+FROM Sales4 
+WHERE EXTRACT(YEAR FROM sale_date) = 2025
+GROUP BY TO_CHAR(sale_date, 'Month') 
+ORDER BY TO_DATE(TO_CHAR(sale_date, 'Month'), 'Month');
