@@ -418,3 +418,95 @@ FROM Sales4
 WHERE EXTRACT(YEAR FROM sale_date) = 2025
 GROUP BY TO_CHAR(sale_date, 'Month') 
 ORDER BY TO_DATE(TO_CHAR(sale_date, 'Month'), 'Month');
+
+-----------------------------------------------------------------
+-- How can you identify and optimize slow-running queries in SQL?
+
+-- Use the EXPLAIN command to analyze query execution plans. 
+EXPLAIN SELECT * FROM Orders WHERE customer_id = 123; 
+ -- Add appropriate indexes to improve query speed 
+CREATE INDEX idx_customer_id ON Orders (customer_id); 
+ -- Optimize joins and reduce the number of rows processed. 
+SELECT o.order_id, c.customer_name  
+FROM Orders o  
+JOIN Customers c ON o.customer_id = c.customer_id 
+WHERE c.region = 'North'; 
+
+
+-------------------------------------------------------
+--  What are the differences between temporary and permanent tables, and when would you use each?
+
+-- Temporary Table (Exists for the session) 
+CREATE TEMPORARY TABLE temp_orders AS  
+SELECT * FROM Orders;
+
+-- Permanent Table (Exists indefinitely until dropped) 
+CREATE TABLE permanent_orders AS  
+SELECT * FROM Orders; 
+
+
+------------------------------------------------------------
+---How do you implement full-text search on a column in SQL?
+-- Create a full-text index on a column (SQL/MYSQL SERVER)
+CREATE FULLTEXT INDEX ON Products(product_description); 
+ -- Use the CONTAINS function to search for a keyword 
+SELECT * FROM Products WHERE 
+CONTAINS(product_description, 'laptop'); 
+
+
+--------------------------------------------------------------------
+CREATE TABLE Employees (
+    employee_id INT PRIMARY KEY,
+    manager_id INT,
+    name VARCHAR(50)
+);
+
+
+INSERT INTO Employees (employee_id, manager_id, name) VALUES
+(1, NULL, 'Alice'),       -- CEO
+(2, 1, 'Bob'),            -- Reports to Alice
+(3, 1, 'Carol'),          -- Reports to Alice
+(4, 2, 'David'),          -- Reports to Bob
+(5, 2, 'Eve'),            -- Reports to Bob
+(6, 3, 'Frank'),          -- Reports to Carol
+(7, 4, 'Grace'),          -- Reports to David
+(8, 6, 'Heidi');          -- Reports to Frank
+
+/*
+How do you query hierarchical data stored in a self referencing table? 
+*/
+WITH RECURSIVE Hierarchy AS ( 
+    SELECT employee_id, manager_id, name, 0 AS level 
+    FROM Employees 
+    WHERE manager_id IS NULL
+
+    UNION ALL
+
+    SELECT e.employee_id, e.manager_id, e.name, h.level + 1 
+    FROM Employees e 
+    INNER JOIN Hierarchy h ON e.manager_id = h.employee_id 
+) 
+SELECT * FROM Hierarchy;
+
+
+---------------------------------------------------------------
+/*
+Explain how partitioning works in SQL and provide 
+an example of partitioning a table by date. 
+*/
+CREATE TABLE Sales4 (
+    sale_id INT,
+    sale_date DATE,
+    amount DECIMAL(10, 2),
+    sale_year INT GENERATED ALWAYS AS (EXTRACT(YEAR FROM sale_date)) STORED
+) PARTITION BY RANGE (sale_year);
+
+
+CREATE TABLE Sales4_p2022 PARTITION OF Sales4
+FOR VALUES FROM (2022) TO (2023);
+
+CREATE TABLE Sales4_p2023 PARTITION OF Sales4
+FOR VALUES FROM (2023) TO (2024);
+
+
+--------------------------------------------------------------
