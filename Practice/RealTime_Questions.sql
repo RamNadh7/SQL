@@ -416,7 +416,7 @@ SELECT TO_CHAR(sale_date, 'Month') AS month,
        SUM(amount) AS total_sales
 FROM Sales4 
 WHERE EXTRACT(YEAR FROM sale_date) = 2025
-GROUP BY TO_CHAR(sale_date, 'Month') 
+GROUP BY 1
 ORDER BY TO_DATE(TO_CHAR(sale_date, 'Month'), 'Month');
 
 -----------------------------------------------------------------
