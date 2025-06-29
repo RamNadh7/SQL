@@ -510,13 +510,14 @@ FOR VALUES FROM (2023) TO (2024);
 
 
 --------------------------------------------------------------
-
 /*
 How would you manage concurrency issues in SQL, 
 such as the lost update problem?
 */
 
 -- Set transaction isolation level to SERIALIZABLE 
+--Ensures transactions run as if executed one at a time
+---Highest safety, but can reduce concurrency
 SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; 
  
 BEGIN TRANSACTION; -- Perform the update or insert operation 
