@@ -381,6 +381,10 @@ INSERT INTO Sales4 (sale_id, sale_date, amount) VALUES
 (9, '2025-08-28', 200.00),
 (10, '2025-11-11', 700.00);
 
+/*
+Write a dynamic SQL query to generate a report of sales per month for a given year
+*/
+
 
 DO $$
 DECLARE
@@ -411,6 +415,8 @@ BEGIN
 
     EXECUTE dyn_query;
 END $$;
+
+
 
 SELECT TO_CHAR(sale_date, 'Month') AS month, 
        SUM(amount) AS total_sales
@@ -520,5 +526,265 @@ such as the lost update problem?
 ---Highest safety, but can reduce concurrency
 SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; 
  
-BEGIN TRANSACTION; -- Perform the update or insert operation 
+BEGIN TRANSACTION; 
+-- Perform the update or insert operation 
 COMMIT; 
+
+
+------------------------------------------------------
+/*
+Write a dynamic SQL query that generates a report of sales by region for a given year.
+*/
+
+DO $$
+DECLARE
+    target_year INT := 2025;  -- change this to your desired year
+    dyn_query TEXT;
+BEGIN
+    dyn_query := 'SELECT region, SUM(amount) AS total_sales
+        FROM Sales
+        WHERE EXTRACT(YEAR FROM sale_date) = ' || target_year || '
+        GROUP BY region
+        ORDER BY region;
+    ';
+    EXECUTE dyn_query;
+END $$;
+
+--------------------------------------------------------------------------
+
+CREATE TABLE Sales5 (
+    sale_id INT PRIMARY KEY,
+    product_id INT,
+    sale_date DATE,
+    amount DECIMAL(10, 2)
+);
+
+
+INSERT INTO Sales5 (sale_id, product_id, sale_date, amount) VALUES
+(1, 101, '2025-01-05', 120.00),
+(2, 101, '2025-01-10', 150.00),
+(3, 101, '2025-01-15', 100.00),
+(4, 102, '2025-01-06', 90.00),
+(5, 102, '2025-01-12', 130.00),
+(6, 101, '2025-01-20', 110.00),
+(7, 102, '2025-01-22', 80.00),
+(8, 103, '2025-01-09', 200.00),
+(9, 103, '2025-01-12', 300.00);
+
+/* Write a query to calculate a running total of sales for each product.*/
+
+SELECT
+    product_id,
+    sale_date,
+    amount,
+    SUM(amount) OVER (
+        PARTITION BY product_id
+        ORDER BY sale_date
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS running_total
+FROM Sales5
+ORDER BY product_id, sale_date;
+
+
+
+---------------------------------------------------------------------
+CREATE TABLE Orders2 (
+    order_id INT,
+    customer_name VARCHAR(50),
+    order_date DATE,
+    amount DECIMAL(10,2)
+);
+
+
+INSERT INTO Orders2 (order_id, customer_name, order_date, amount) VALUES
+(1, 'Alice', '2025-06-01', 100.00),
+(2, 'Bob',   '2025-06-02', 150.00),
+(3, 'Alice', '2025-06-01', 100.00),  -- duplicate of order 1 (not same ID)
+(4, 'Carol', '2025-06-03', 200.00),
+(5, 'Bob',   '2025-06-02', 150.00),  -- duplicate of order 2
+(6, 'Dave',  '2025-06-04', 180.00);
+
+
+/*
+Write a query to identify duplicate rows in a table based on a combination of columns.
+*/
+
+SELECT 
+    customer_name,
+    order_date,
+    amount,
+    COUNT(*) AS duplicate_count
+FROM Orders2
+GROUP BY customer_name, order_date, amount
+HAVING COUNT(*) > 1;
+
+-----------------------------------------------------
+CREATE TABLE Departments (
+    dept_id INT PRIMARY KEY,
+    dept_name VARCHAR(100),
+    parent_dept_id INT
+);
+
+INSERT INTO Departments VALUES
+(1, 'Corporate', NULL),
+(2, 'Sales', 1),
+(3, 'Domestic Sales', 2),
+(4, 'International Sales', 2),
+(5, 'Engineering', 1),
+(6, 'Software', 5),
+(7, 'Hardware', 5);
+
+/* How do you write a recursive CTE to navigate a hierarchy of departments?*/
+
+WITH RECURSIVE DeptHierarchy AS (
+    -- Anchor member: top-level departments (no parent)
+    SELECT 
+        dept_id, 
+        dept_name, 
+        parent_dept_id,
+        0 AS level
+    FROM Departments
+    WHERE parent_dept_id IS NULL
+
+    UNION ALL
+
+    -- Recursive member: find children of the current level
+    SELECT 
+        d.dept_id, 
+        d.dept_name, 
+        d.parent_dept_id,
+        h.level + 1
+    FROM Departments d
+    INNER JOIN DeptHierarchy h ON d.parent_dept_id = h.dept_id
+)
+SELECT * 
+FROM DeptHierarchy
+ORDER BY level, dept_name;
+
+-------------------------------------------------------
+CREATE TABLE Employees1 (
+    employee_id INT PRIMARY KEY,
+    name VARCHAR(50),
+    manager_id INT
+);
+
+
+INSERT INTO Employees1 (employee_id, name, manager_id) VALUES
+(1, 'Alice', NULL),          -- CEO
+(2, 'Bob', 1),               -- Reports to Alice
+(3, 'Carol', 1),             -- Reports to Alice
+(4, 'David', 2),             -- Reports to Bob
+(5, 'Eve', 2),               -- Reports to Bob
+(6, 'Frank', 3),             -- Reports to Carol
+(7, 'Grace', 4),             -- Reports to David
+(8, 'Heidi', 5),             -- Reports to Eve
+(9, 'Ivan', 6),              -- Reports to Frank
+(10, 'Judy', 7);             -- Reports to Grace
+
+
+/*Write a recursive CTE to find all employees in an organization and their respective managers, given an Employees table.*/
+
+WITH RECURSIVE EmployeeHierarchy AS (
+    -- Base case: select each employee and their immediate manager
+    SELECT 
+        e.employee_id,
+        e.name AS employee_name,
+        m.employee_id AS manager_id,
+        m.name AS manager_name,
+        0 AS level
+    FROM Employees1 e
+    LEFT JOIN Employees1 m ON e.manager_id = m.employee_id
+    UNION ALL
+    -- Recursive case: climb up the management tree
+    SELECT 
+        eh.employee_id,
+        eh.employee_name,
+        m.employee_id,
+        m.name,
+        eh.level + 1
+    FROM EmployeeHierarchy eh
+    JOIN Employees1 m ON eh.manager_id = m.employee_id
+)
+SELECT * 
+FROM EmployeeHierarchy
+ORDER BY employee_id, level;
+
+
+WITH RECURSIVE EmployeeHierarchy AS (
+    SELECT 
+        e.employee_id,
+        e.name AS employee_name,
+        m.employee_id AS manager_id,
+        m.name AS manager_name,
+        0 AS level,
+        ARRAY[e.employee_id] AS path
+    FROM Employees1 e
+    LEFT JOIN Employees1 m ON e.manager_id = m.employee_id
+
+    UNION ALL
+
+    SELECT 
+        eh.employee_id,
+        eh.employee_name,
+        m.employee_id,
+        m.name,
+        eh.level + 1,
+        path || m.employee_id
+    FROM EmployeeHierarchy eh
+    JOIN Employees1 m ON eh.manager_id = m.employee_id
+    WHERE NOT m.employee_id = ANY(eh.path)
+)
+SELECT employee_id, employee_name, manager_id, manager_name, level
+FROM EmployeeHierarchy
+ORDER BY employee_id, level;
+
+
+WITH RECURSIVE EmployeeCTE AS (
+SELECT employee_id, manager_id, name
+FROM Employees1
+WHERE manager_id IS NULL
+UNION ALL
+SELECT e.employee_id, e.manager_id, e.name
+FROM Employees1 e
+INNER JOIN EmployeeCTE cte ON e.manager_id =
+cte.employee_id
+)
+SELECT * FROM EmployeeCTE;
+
+
+-------------------------------------------------------------------
+
+
+/*
+Write a query that categorizes sales amounts into different ranges using the CASE statement.
+*/
+
+CREATE TABLE Sales6 (
+    sale_id INT PRIMARY KEY,
+    sale_date DATE,
+    amount DECIMAL(10,2)
+);
+
+INSERT INTO Sales6 (sale_id, sale_date, amount) VALUES
+(1, '2025-06-01', 45.00),
+(2, '2025-06-02', 120.00),
+(3, '2025-06-03', 300.00),
+(4, '2025-06-04', 90.00),
+(5, '2025-06-05', 510.00),
+(6, '2025-06-06', 499.99),
+(7, '2025-06-07', 1000.00),
+(8, '2025-06-08', 15.00);
+
+
+SELECT
+    sale_id,
+    amount,
+    CASE 
+        WHEN amount < 100 THEN 'Low'
+        WHEN amount BETWEEN 100 AND 499.99 THEN 'Medium'
+        WHEN amount >= 500 THEN 'High'
+        ELSE 'Unknown'
+    END AS amount_category
+FROM Sales6;
+
+----------------------------------------------------------------------
