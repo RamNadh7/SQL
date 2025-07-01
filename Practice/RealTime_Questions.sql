@@ -788,3 +788,341 @@ SELECT
 FROM Sales6;
 
 ----------------------------------------------------------------------
+
+/*Given a JSON column named `data` in a table, write a query to extract a specific value from the JSON object. */
+
+SELECT 
+    data ->> 'customer_name' AS customer_name
+FROM orders;
+
+
+{
+  "customer": {
+    "name": "Alice",
+    "email": "alice@example.com"
+  },
+  "total": 100.0
+}
+
+SELECT 
+    data -> 'customer' ->> 'name' AS customer_name
+FROM orders;
+
+
+
+-------------------------------------------------------------------------
+/* Write a query to rank employees based on their sales performance within each department.
+*/
+CREATE TABLE Employees2 (
+    employee_id INT PRIMARY KEY,
+    name VARCHAR(50),
+    department_id INT
+);
+
+CREATE TABLE Sales7 (
+    sale_id INT PRIMARY KEY,
+    employee_id INT,
+    amount DECIMAL(10,2)
+);
+
+
+-- Employees table
+INSERT INTO Employees2 (employee_id, name, department_id) VALUES
+(1, 'Alice', 10),
+(2, 'Bob', 10),
+(3, 'Carol', 10),
+(4, 'David', 20),
+(5, 'Eve', 20),
+(6, 'Frank', 30);
+
+-- Sales table
+INSERT INTO Sales7 (sale_id, employee_id, amount) VALUES
+(101, 1, 300.00),
+(102, 1, 200.00),
+(103, 2, 500.00),
+(104, 3, 150.00),
+(105, 3, 150.00),
+(106, 4, 700.00),
+(107, 5, 400.00),
+(108, 5, 200.00),
+(109, 6, 100.00),
+(110, 6, 50.00);
+
+
+SELECT
+    e.department_id,
+    e.employee_id,
+    e.name,
+    SUM(s.amount) AS total_sales,
+    RANK() OVER (
+        PARTITION BY e.department_id
+        ORDER BY SUM(s.amount) DESC
+    ) AS sales_rank
+FROM Employees2 e
+JOIN Sales7 s ON e.employee_id = s.employee_id
+GROUP BY e.department_id, e.employee_id, e.name
+ORDER BY e.department_id, sales_rank;
+
+
+------------------------------------------------------------------------
+CREATE TABLE Sales8 (
+    sale_id INT PRIMARY KEY,
+    product_name VARCHAR(50),
+    sale_date DATE,
+    amount DECIMAL(10,2)
+);
+
+
+INSERT INTO Sales8 (sale_id, product_name, sale_date, amount) VALUES
+(1, 'Laptop', '2025-01-10', 1200.00),
+(2, 'Laptop', '2025-02-15', 1350.00),
+(3, 'Laptop', '2025-03-20', 1100.00),
+(4, 'Phone',  '2025-01-05', 600.00),
+(5, 'Phone',  '2025-01-25', 650.00),
+(6, 'Phone',  '2025-03-10', 700.00),
+(7, 'Tablet', '2025-02-10', 500.00),
+(8, 'Tablet', '2025-02-18', 550.00),
+(9, 'Tablet', '2025-03-22', 620.00),
+(10, 'Tablet','2025-01-30', 400.00);
+
+/*Write a query to pivot sales data to show the total sales for each product by month
+*/
+
+
+SELECT
+    product_name,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 1 THEN amount ELSE 0 END) AS Jan,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 2 THEN amount ELSE 0 END) AS Feb,
+    SUM(CASE WHEN EXTRACT(MONTH FROM sale_date) = 3 THEN amount ELSE 0 END) AS Mar
+FROM Sales8
+GROUP BY product_name
+ORDER BY product_name;
+
+
+-----------------------------------------------------------------------
+CREATE TABLE Sales9 (
+    sale_id INT PRIMARY KEY,
+    product_name VARCHAR(50),
+    sale_date DATE,
+    amount DECIMAL(10,2)
+);
+
+INSERT INTO Sales9 (sale_id, product_name, sale_date, amount) VALUES
+(1, 'Laptop', '2025-06-01', 1200.00),
+(2, 'Laptop', '2025-06-05', 1350.00),
+(3, 'Phone',  '2025-06-03', 800.00),
+(4, 'Phone',  '2025-06-07', 900.00),
+(5, 'Tablet', '2025-06-02', 500.00),
+(6, 'Tablet', '2025-06-06', 550.00),
+(7, 'Tablet', '2025-06-08', 600.00);
+
+/*Write a query to calculate total sales with subtotals for each product and grand total.*/
+
+SELECT 
+    COALESCE(product_name, 'Grand Total') AS category,
+    SUM(amount) AS total_sales
+FROM Sales9
+GROUP BY ROLLUP(product_name);
+
+
+----------------------------------------------------------------------
+/*How would you write a SQL transaction that rolls back if an error occurs?*/
+
+DO $$
+BEGIN
+    BEGIN
+        -- Start transaction manually
+        INSERT INTO Sales VALUES (11, 'Monitor', 300.00);
+
+        -- Intentional or potential error
+        UPDATE Inventory SET quantity = quantity - 1
+        WHERE product_name = 'Monitor';
+
+        COMMIT;
+    EXCEPTION WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE NOTICE 'Transaction failed and was rolled back';
+    END;
+END $$;
+
+
+-------------------------------------------------------------------------
+/*Write a trigger that automatically updates a timestamp column when a record is modified.*/
+
+CREATE TABLE Products (
+    product_id SERIAL PRIMARY KEY,
+    product_name VARCHAR(100),
+    price DECIMAL(10,2),
+    last_updated TIMESTAMP
+);
+
+
+CREATE OR REPLACE FUNCTION update_last_modified()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.last_updated := CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER set_last_updated
+BEFORE UPDATE ON Products
+FOR EACH ROW
+EXECUTE FUNCTION update_last_modified();
+
+
+---------------------------------------------------------------------------
+/*What is a cross join, and provide a query example that demonstrates its use?*/
+
+SELECT a.name, b.product_name
+FROM Customers a
+CROSS JOIN Products b;
+
+--- A cross join produces a Cartesian product, combining every row from one table with every row from another.
+
+---------------------------------------------------------------------
+
+
+
+/*Write a query to use the MERGE statement for updating existing records or inserting new ones.*/
+
+CREATE TABLE Customers1 (
+    customer_id INT PRIMARY KEY,
+    customer_name VARCHAR(100),
+    email VARCHAR(100)
+);
+
+delete from customers1;
+
+INSERT INTO Customers1 (customer_id, customer_name, email) VALUES
+(1, 'Alice', 'alice@example.com'),
+(2, 'Bob', 'bob@example.com'),
+(3, 'Carol', 'carol@example.com');
+
+
+
+select * from customers1;
+
+CREATE TABLE CustomerUpdates (
+    customer_id INT,
+    customer_name VARCHAR(100),
+    email VARCHAR(100)
+);
+
+
+INSERT INTO CustomerUpdates (customer_id, customer_name, email) VALUES
+(2, 'Bob B.', 'bob.b@example.com'),       -- should trigger UPDATE
+(3, 'Carol C.', 'carol.c@example.com'),   -- should trigger UPDATE
+(4, 'David', 'david@example.com');        -- should trigger INSERT
+
+select * from customerupdates;
+delete from customerupdates;
+
+
+
+---- Write a query to use the MERGE statement for updating existing records or inserting new ones
+MERGE INTO Customers1 AS target
+USING CustomerUpdates AS source
+ON target.customer_id = source.customer_id
+
+WHEN MATCHED THEN
+    UPDATE SET 
+        customer_name = source.customer_name,
+        email = source.email
+
+WHEN NOT MATCHED THEN
+    INSERT (customer_id, customer_name, email)
+    VALUES (source.customer_id, source.customer_name, source.email);
+
+
+-------------------------------------------------------------------------
+CREATE TABLE Orders3 (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date DATE
+);
+
+INSERT INTO Orders3 (order_id, customer_id, order_date) VALUES
+(1, 101, '2025-06-01'),
+(2, 102, '2025-06-02'),
+(3, NULL, '2025-06-03'),
+(4, 101, '2025-06-04'),
+(5, NULL, '2025-06-05'),
+(6, 103, '2025-06-06'),
+(7, 102, '2025-06-07'),
+(8, NULL, '2025-06-08');
+
+/*Write a query that counts the number of orders placed by customers, treating NULL customer IDs as 'Unknown'.*/
+
+SELECT 
+    COALESCE(CAST(customer_id AS VARCHAR), 'Unknown') AS customer_label,
+    COUNT(*) AS total_orders
+FROM Orders3
+GROUP BY COALESCE(CAST(customer_id AS VARCHAR), 'Unknown')
+ORDER BY customer_label;
+
+
+------------------------------------------------------------------------------
+/* How can you combine data from two different tables that have similar structures, such as Orders2022 and Orders2023? */
+
+SELECT * FROM Orders2022
+UNION ALL
+SELECT * FROM Orders2023;
+
+-----------------------------------------------------------------------
+/* Write a query to update the status of all orders that have been shipped but not delivered. */
+
+UPDATE Orders
+SET status = 'In Transit'
+WHERE shipped_date IS NOT NULL
+AND delivered_date IS NULL;
+
+
+------------------------------------------------------------------
+
+CREATE TABLE Employees3 (
+    employee_id INT PRIMARY KEY,
+    name VARCHAR(100)
+);
+
+CREATE TABLE Sales10 (
+    sale_id INT PRIMARY KEY,
+    employee_id INT,
+    sale_amount DECIMAL(10,2)
+);
+
+-- Employees
+INSERT INTO Employees3 (employee_id, name) VALUES
+(1, 'Alice'),
+(2, 'Bob'),
+(3, 'Carol'),
+(4, 'David'),
+(5, 'Eve');
+
+-- Sales
+INSERT INTO Sales10 (sale_id, employee_id, sale_amount) VALUES
+(101, 1, 500.00),
+(102, 1, 300.00),
+(103, 2, 800.00),
+(104, 3, 300.00),
+(105, 3, 500.00),
+(106, 4, 200.00),
+(107, 5, 200.00),
+(108, 5, 100.00);
+
+/*Write a query to rank employees by their total sales, without skipping rank numbers for ties. */
+SELECT 
+    e.employee_id,
+    e.name,
+    SUM(s.sale_amount) AS total_sales,
+    DENSE_RANK() OVER (
+        ORDER BY SUM(s.sale_amount) DESC
+    ) AS sales_rank
+FROM Employees3 e
+JOIN Sales10 s ON e.employee_id = s.employee_id
+GROUP BY e.employee_id, e.name
+ORDER BY sales_rank;
+
+
+-------------------------------------------------------------------
