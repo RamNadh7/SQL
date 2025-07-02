@@ -1126,3 +1126,255 @@ ORDER BY sales_rank;
 
 
 -------------------------------------------------------------------
+
+CREATE TABLE Customers2 (
+    customer_id INT PRIMARY KEY,
+    customer_name VARCHAR(100)
+);
+
+CREATE TABLE Orders4 (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date DATE
+);
+
+-- Customers
+INSERT INTO Customers2 (customer_id, customer_name) VALUES
+(101, 'Alice'),
+(102, 'Bob'),
+(103, 'Carol'),
+(104, 'David');
+
+-- Orders
+INSERT INTO Orders4 (order_id, customer_id, order_date) VALUES
+(1, 101, CURRENT_DATE - INTERVAL '10 day'),  -- recent order
+(2, 102, CURRENT_DATE - INTERVAL '40 day'),  -- too old
+(3, 103, CURRENT_DATE - INTERVAL '5 day'),   -- recent order
+(4, 104, CURRENT_DATE - INTERVAL '60 day');  -- too old
+
+/*Write a query to find customers who have placed at least one order in the last month.*/
+SELECT 
+    customer_id, 
+    customer_name
+FROM Customers2 c
+WHERE EXISTS (
+    SELECT 1 
+    FROM Orders4 o
+    WHERE o.customer_id = c.customer_id
+    AND o.order_date >= CURRENT_DATE - INTERVAL '1 month'
+);
+
+SELECT DISTINCT customer_id
+FROM Orders4
+WHERE order_date >= CURRENT_DATE - INTERVAL '1 month';
+
+--------------------------------------------------------------
+
+CREATE TABLE Employees4 (
+    employee_id INT PRIMARY KEY,
+    name VARCHAR(100),
+    manager_id INT
+);
+
+
+INSERT INTO Employees4 (employee_id, name, manager_id) VALUES
+(1, 'Alice', NULL),        -- CEO
+(2, 'Bob', 1),
+(3, 'Carol', 1),
+(4, 'David', 2),
+(5, 'Eve', 2),
+(6, 'Frank', 3),
+(7, 'Grace', 4),
+(8, 'Heidi', 5),
+(9, 'Ivan', 6);
+
+
+/*How would you write a recursive query to retrieve all managers and their subordinates from an Employees table?*/
+
+WITH RECURSIVE EmployeeHierarchy AS (
+    SELECT 
+        employee_id,
+        name AS employee_name,
+        manager_id,
+        0 AS level,
+        ARRAY[name]::VARCHAR[] AS path
+    FROM Employees4
+    WHERE manager_id IS NULL
+
+    UNION ALL
+
+    SELECT 
+        e.employee_id,
+        e.name,
+        e.manager_id,
+        eh.level + 1,
+        eh.path || e.name
+    FROM Employees4 e
+    JOIN EmployeeHierarchy eh ON e.manager_id = eh.employee_id
+)
+
+SELECT 
+    employee_id,
+    employee_name,
+    manager_id,
+    level,
+    ARRAY_TO_STRING(path, ' → ') AS reporting_path
+FROM EmployeeHierarchy
+ORDER BY level, employee_id;
+
+--or
+
+WITH recursive EmployeeHierarchy AS (
+SELECT employee_id, manager_id, name, 0 AS Level
+FROM Employees4
+WHERE manager_id IS NULL
+UNION ALL
+SELECT e.employee_id, e.manager_id, e.name, eh.Level + 1
+FROM Employees4 e
+INNER JOIN EmployeeHierarchy eh ON e.manager_id =
+eh.employee_id
+)
+SELECT * FROM EmployeeHierarchy;
+
+------------------------------------------------------------------
+/*How would you write a recursive query to retrieve all managers and their subordinates from an Employees table?*/
+
+CREATE INDEX idx_customer_id
+ON Orders(customer_id);
+
+SELECT * FROM Orders WHERE customer_id = 123;
+
+--------------------------------------------------------------------
+CREATE TABLE Sales11 (
+    employee_id INT,
+    sale_month DATE,
+    sale_amount DECIMAL(10,2)
+);
+
+INSERT INTO Sales11 (employee_id, sale_month, sale_amount) VALUES
+(1, '2024-12-01', 1000),
+(1, '2025-01-01', 1200),
+(1, '2025-02-01', 1100),
+(2, '2025-01-01', 800),
+(2, '2025-02-01', 950),
+(3, '2025-02-01', 500);
+
+/*Write a query to compare each employee's sales with their previous month's sales.*/
+SELECT 
+    employee_id,
+    TO_CHAR(sale_month, 'YYYY-MM') AS month,
+    sale_amount AS current_month_sales,
+    LAG(sale_amount) OVER (
+        PARTITION BY employee_id 
+        ORDER BY sale_month
+    ) AS previous_month_sales,
+    ROUND(
+        100.0 * (sale_amount - LAG(sale_amount) OVER (
+            PARTITION BY employee_id 
+            ORDER BY sale_month
+        )) / NULLIF(LAG(sale_amount) OVER (
+            PARTITION BY employee_id 
+            ORDER BY sale_month
+        ), 0), 2
+    ) AS percent_change
+FROM Sales11
+ORDER BY employee_id, sale_month;
+
+--or 
+SELECT employee_id, sale_month, sale_amount,
+LAG(sale_amount) OVER (PARTITION BY employee_id
+ORDER BY sale_month) AS previous_month_sales,
+LEAD(sale_amount) OVER (PARTITION BY employee_id
+ORDER BY sale_month) AS next_month_sales
+FROM sales11;
+
+
+------------------------------------------------------------------------
+/*Write a query to count the number of unique customers who placed orders in the last year.*/
+
+ SELECT COUNT(DISTINCT customer_id) AS unique_customers_last_year
+FROM Orders
+WHERE order_date >= CURRENT_DATE - INTERVAL '1 year';
+
+
+--------------------------------------------------------------------
+/*Write a query to calculate the total sales for each product category, with a separate total for 'Electronics'.*/
+
+-- Products table
+CREATE TABLE Products (
+    product_id INT PRIMARY KEY,
+    product_name VARCHAR(100),
+    category VARCHAR(50)
+);
+
+-- Sales table
+CREATE TABLE Sales12(
+    sale_id INT PRIMARY KEY,
+    product_id INT,
+    quantity INT,
+    unit_price DECIMAL(10,2)
+);
+
+-- Products
+INSERT INTO Products VALUES
+(1, 'Laptop', 'Electronics'),
+(2, 'Smartphone', 'Electronics'),
+(3, 'Desk Chair', 'Furniture'),
+(4, 'Notebook', 'Stationery');
+
+-- Sales
+INSERT INTO Sales12 VALUES
+(101, 1, 2, 1000.00),   -- Laptop
+(102, 2, 3, 500.00),    -- Smartphone
+(103, 3, 5, 150.00),    -- Desk Chair
+(104, 4, 10, 5.00);     -- Notebook
+
+
+
+-- Total sales per category
+SELECT 
+    p.category,
+    SUM(s.quantity * s.unit_price) AS total_sales
+FROM Sales12 s
+JOIN Products p ON s.product_id = p.product_id
+GROUP BY p.category
+
+UNION ALL
+
+-- Separate total for Electronics
+SELECT 
+    'Electronics (Total)' AS category,
+    SUM(s.quantity * s.unit_price)
+FROM Sales12 s
+JOIN Products p ON s.product_id = p.product_id
+WHERE p.category = 'Electronics';
+
+-----------------------------------------------------------------------
+/*Write a query to calculate the average, minimum,and maximum sales amount for each region.*/
+SELECT region,
+AVG(sales_amount) AS average_sales,
+MIN(sales_amount) AS min_sales,
+MAX(sales_amount) AS max_sales
+FROM Sales
+GROUP BY region
+
+
+-----------------------------------------------------------------
+/*Write a query to return the second page of results from an Orders table, assuming each page shows 10 results.*/
+SELECT * FROM Orders
+ORDER BY order_date
+OFFSET 1 ROWS
+FETCH NEXT 10 ROWS ONLY;
+
+-------------------------------------------------------------
+/*Write a query to find all employees who share the same manager in an Employees table.*/
+SELECT e1.employee_id, e1.name AS employee_name, e2.name
+AS manager_name
+FROM Employees e1
+JOIN Employees e2 ON e1.manager_id = e2.employee_id;
+
+---------------------------------------------------------------------
+SELECT 
+    order_id,
+    delivery_date - order_date AS days_to_deliver
+FROM Orders;
