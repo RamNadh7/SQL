@@ -1374,7 +1374,550 @@ FROM Employees e1
 JOIN Employees e2 ON e1.manager_id = e2.employee_id;
 
 ---------------------------------------------------------------------
+CREATE TABLE Orders5 (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date DATE,
+    delivery_date DATE
+);
+
+INSERT INTO Orders5 (order_id, customer_id, order_date, delivery_date) VALUES
+(1, 101, DATE '2025-06-01', DATE '2025-06-05'),
+(2, 102, DATE '2025-06-03', DATE '2025-06-10'),
+(3, 103, DATE '2025-06-07', DATE '2025-06-07'),
+(4, 104, DATE '2025-06-10', DATE '2025-06-15'),
+(5, 105, DATE '2025-06-12', NULL);  -- still pending delivery
+
+/*Write a query to calculate the number of days between an order date and a delivery date.*/
 SELECT 
+
     order_id,
     delivery_date - order_date AS days_to_deliver
-FROM Orders;
+FROM Orders5;
+ ---- If you want to show how many days have passed since the order for undelivered items
+SELECT 
+    order_id,
+    delivery_date,
+    order_date,
+    COALESCE(delivery_date, CURRENT_DATE) - order_date AS days_elapsed
+FROM Orders5;
+
+
+--------------------------------------------------------------------------------
+
+CREATE TABLE Invoices (
+    invoice_number INT PRIMARY KEY
+);
+
+INSERT INTO Invoices (invoice_number) VALUES
+(1001), (1002), (1003), (1005), (1006), (1009), (1010);
+
+/*How can you write a query to detect missing invoice numbers in a sequence of invoices?*/
+WITH RECURSIVE expected_numbers AS (
+    SELECT MIN(invoice_number) AS num
+    FROM Invoices
+    UNION ALL
+    SELECT num + 1
+    FROM expected_numbers
+    WHERE num + 1 <= (SELECT MAX(invoice_number) FROM Invoices)
+)
+SELECT num AS missing_invoice
+FROM expected_numbers
+WHERE num NOT IN (SELECT invoice_number FROM Invoices);
+
+------------------------------------------------------------------------------
+Explain the difference between INNER JOIN, LEFT JOIN, RIGHT JOIN, and FULL JOIN with examples.
+
+• INNER JOIN returns records that have matching values in both tables.
+• LEFT JOIN returns all records from the left table and matching records from the right.
+• RIGHT JOIN returns all records from the right table and matching records from the left.
+• FULL JOIN returns all records when there is a match in either table.
+
+-------------------------------------------------------------------------
+
+How would you find duplicate rows in a table?
+
+SELECT column1, COUNT(*)
+FROM table
+GROUP BY column1 having count(*)>1;
+
+------------------------------------------------------------------------------
+What’s the difference between RANK() and DENSE_RANK() in SQL?
+• RANK() gives gaps in ranking after ties.
+• DENSE_RANK() assigns consecutive ranks without gaps
+
+SELECT column, RANK() OVER (ORDER BY column DESC) AS rank
+FROM table;
+
+
+--------------------------------------------------------------------------------
+How would you remove duplicate rows in SQL?
+WITH cte AS (
+SELECT column, ROW_NUMBER() OVER(PARTITION BY
+column ORDER BY column) AS row_num
+FROM table
+)
+Delete from cte where row_num>1;
+
+-----------------------------------------------------------------------------
+Explain window functions and how you would use them in SQL.
+
+Window functions perform calculations across a set of rows related to the current row, like RANK(), SUM(), AVG(),and ROW_NUMBER(). They are useful for calculations without collapsing rows.
+
+SELECT column, SUM(value) OVER(PARTITION BY category)
+AS sum_value
+FROM table;
+
+------------------------------------------------------------------------------
+How would you fetch only even-numbered rows from a table?
+
+SELECT *
+FROM (
+SELECT *, ROW_NUMBER() OVER (ORDER BY column) AS
+row_num
+FROM table
+) AS subquery
+WHERE row_num % 2 = 0;
+
+
+----------------------------------------------------------------------------
+What is the purpose of the EXPLAIN statement in SQL?
+EXPLAIN analyzes the query execution plan, showing how tables are accessed, indices used, and estimated costs, allowing you to optimize queries.
+
+----------------------------------------------------------------------------
+Explain a scenario where you’d use a SELF JOIN.
+Use a SELF JOIN when you need to compare rows within the same table, such as finding employee-manager relationships within an employee table.
+
+SELECT a.employee_id, b.employee_id AS manager_id
+FROM employees a
+JOIN employees b ON a.manager_id = b.employee_id;
+
+-----------------------------------------------------------------------------
+How can you optimize a query with multiple joins?
+
+Index columns involved in joins, filter data early, and
+order joins so smaller tables are joined first. Use EXPLAIN to
+check performance.
+
+
+----------------------------------------------------------------------------
+Describe the difference between WHERE and HAVING.
+
+WHERE filters rows before aggregation, while
+HAVING filters after aggregation. Use WHERE for raw data and
+HAVING for aggregate functions.
+
+-----------------------------------------------------------------------------
+/* How would you calculate the cumulative sum in SQL? */
+
+CREATE TABLE Sales13 (
+    sale_id INT PRIMARY KEY,
+    sale_date DATE,
+    amount DECIMAL(10,2)
+);
+
+INSERT INTO Sales13 (sale_id, sale_date, amount) VALUES
+(1, '2025-01-01', 100.00),
+(2, '2025-01-03', 150.00),
+(3, '2025-01-05', 200.00),
+(4, '2025-01-07', 50.00),
+(5, '2025-01-10', 300.00);
+
+
+SELECT 
+    sale_id,
+    sale_date,
+    amount,
+    SUM(amount) OVER (ORDER BY sale_date) AS cumulative_sales
+FROM Sales13
+ORDER BY sale_date;
+
+or 
+SELECT column, SUM(value) OVER (ORDER BY column ROWS
+BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS
+cumulative_sum
+FROM table;
+
+---------------------------------------------------------------------------
+What is the difference between UNION and UNION ALL?
+Answer: UNION removes duplicates, while UNION ALL keeps
+all results, including duplicates. UNION ALL is faster for larger
+datasets.
+
+--------------------------------------------------------------------------
+/*How would you delete rows that are duplicates but keep
+the first occurrence?*/
+
+WITH cte AS (
+SELECT *, ROW_NUMBER() OVER(PARTITION BY column
+ORDER BY column) AS row_num
+FROM table
+)
+DELETE FROM cte WHERE row_num > 1;
+
+----------------------------------------------------------------------------
+Explain a correlated subquery and give an example.
+
+SELECT name
+FROM employees e1
+WHERE salary > (
+SELECT AVG(salary)
+FROM employees e2
+WHERE e1.department_id = e2.department_id
+);
+
+
+--------------------------------------------------------------------------
+What is an index, and how does it improve query
+performance?
+
+An index is a data structure that speeds up data retrieval by reducing the amount of data scanned. It acts as a pointer to data rows based on indexed columns.
+
+-----------------------------------------------------------------------
+What’s the difference between a PRIMARY KEY and a
+UNIQUE constraint?
+
+Both enforce uniqueness, but PRIMARY KEY also
+doesn’t allow NULL values and uniquely identifies each row,
+while UNIQUE allows one NULL.
+
+-------------------------------------------------------------------------
+How do you find the nth highest salary in SQL?
+SELECT *
+FROM (
+    SELECT 
+        emp_name,
+        emp_salary,
+        DENSE_RANK() OVER (ORDER BY emp_salary DESC) AS salary_rank
+    FROM Employees
+) ranked
+WHERE salary_rank = N;
+
+
+---------------------------------------------------------------------------
+What is a TRIGGER and when would you use it?
+
+A TRIGGER automatically executes predefined actions
+in response to database events (like insert, update, delete). It’s
+useful for logging changes or enforcing rules.
+
+---------------------------------------------------------------------------
+How would you update records in one table based on
+values in another table?
+
+UPDATE table1
+SET column = table2.value
+FROM table2
+WHERE table1.id = table2.id;
+
+------------------------------------------------------------------------------
+Explain the COALESCE function and give an example.
+
+COALESCE returns the first non-null value among its
+arguments, useful for handling missing values.
+
+SELECT COALESCE(column1, column2, 0) AS result FROM
+table;
+
+-----------------------------------------------------------------------------
+How would you remove rows with NULL values in a specific column?
+
+DELETE FROM table WHERE column IS NULL;
+
+----------------------------------------------------------------------------
+How would you list all unique pairs of columns from the same table?
+
+SELECT DISTINCT a.column1, b.column1
+FROM table a
+Join table b on a.column1<b.column1;
+
+----------------------------------------------------------------------------
+Explain the GROUP BY clause and when you would use it.
+
+GROUP BY groups rows sharing a common field, used with aggregate functions like SUM, COUNT, AVG.
+
+----------------------------------------------------------------------------
+/*
+What is ACID in database transactions?
+
+ACID stands for Atomicity, Consistency, Isolation,
+Durability. It ensures reliable transactions, essential for
+maintaining data integrity.
+
+Atomicity
+
+    A transaction is like a promise — it either completes fully or doesn't happen at all.
+
+    Example: If you're transferring money between accounts, the debit and credit must both succeed — or both fail.
+
+Consistency
+
+    A transaction must leave the database in a valid state, following all constraints and rules.
+
+    Example: If there's a rule that no account balance can be negative, a transaction must respect that — no matter what.
+
+Isolation
+
+    When multiple transactions happen at the same time, they must not interfere with each other.
+
+    Example: Two people buying the last ticket shouldn't both succeed — only the first one who commits the change should win.
+
+Durability
+
+    Once a transaction is committed, it’s saved — even if the system crashes.
+
+    Example: If the power goes out, your confirmed order should still be there when things restart.
+
+*/
+
+-------------------------------------------------------------------------------
+---- How would you calculate the moving average in SQL?
+SELECT column, AVG(value) OVER(ORDER BY date ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS moving_avg FROM table;
+
+------------------------------------------------------------------------------
+Explain what a cross join is and when you might use it
+
+A cross join returns the Cartesian product of two tables. It’s rarely used unless you need all possible combinations of two sets.
+
+------------------------------------------------------------------------------
+What is the difference between DELETE and TRUNCATE?
+DELETE removes rows one by one, can have a WHERE clause, and can be rolled back. TRUNCATE removes all rows quickly, can’t be rolled back, and resets identity columns.
+
+----------------------------------------------------------------------------
+How do you handle NULL values when joining tables?
+Answer: Use LEFT JOIN to retain rows with NULL in one table,
+or use IS NULL or COALESCE to manage NULL values.
+
+----------------------------------------------------------------------------
+How would you select records in one table that don’t exist in another table?
+SELECT a.*
+FROM table_a a
+LEFT JOIN table_b b ON a.id = b.id
+WHERE b.id IS NULL;
+
+---------------------------------------------------------------------------
+How would you pivot data in SQL?
+SELECT category, SUM(CASE WHEN month = 'January' THEN
+value END) AS January
+FROM sales
+GROUP BY category;
+
+----------------------------------------------------------------------------
+How would you normalize a table, and why is it important?
+Normalization removes redundancy by structuring data across tables, enforcing dependencies, and improving consistency.
+
+---------------------------------------------------------------------------
+How would you denormalize data for performance?
+Combine tables to reduce joins, allowing faster reads, often used in reporting databases.
+
+--------------------------------------------------------------------------
+How would you create an index, and when should you avoid it?
+Use CREATE INDEX for frequently searched columns but avoid over-indexing on tables with frequent writes, as it slows down insertions.
+
+-----------------------------------------------------------------------------
+Explain the use of IFNULL and NULLIF.
+IFNULL replaces NULL with a default value, while NULLIF returns NULL if two expressions are equal.
+
+----------------------------------------------------------------------------
+How do you find the first and last records in a grouped dataset?
+SELECT category, FIRST_VALUE(value) OVER (PARTITION BY
+category ORDER BY date) AS first_value
+
+----------------------------------------------------------------------------
+How would you write a recursive query?
+WITH RECURSIVE cte AS (
+SELECT column FROM table
+UNION ALL
+SELECT column FROM table WHERE condition
+)
+
+---------------------------------------------------------------------------
+Explain a CASE statement and give an example.
+
+SELECT name,
+CASE
+WHEN score > 90 THEN 'A'
+WHEN score > 80 THEN 'B'
+ELSE 'C'
+END AS grade
+FROM students;
+
+--------------------------------------------------------------------------
+What are SQL constraints, and why are they important?
+Constraints enforce rules on data, such as PRIMARY KEY, FOREIGN KEY, and CHECK, to maintain integrity.
+
+--------------------------------------------------------------------------
+What is a materialized view?
+A materialized view stores the results of a query physically for fast access, unlike regular views which are computed on demand.
+
+---------------------------------------------------------------------------
+How would you schedule an SQL job to run periodically?
+Use database schedulers, such as SQL Server Agent or cron jobs.
+
+----------------------------------------------------------------------------
+What is the purpose of the LIMIT and OFFSET clauses?
+LIMIT restricts result rows, while OFFSET skips a number of rows, useful for pagination.
+
+-----------------------------------------------------------------------------
+Explain the difference between VARCHAR and CHAR.
+Answer: CHAR has a fixed length, while VARCHAR is variable-length, saving space for shorter values.
+
+-------------------------------------------------------------------------------
+How would you handle transactional deadlocks in SQL?
+Answer: Use retry logic, lower isolation levels, and index tables appropriately to reduce deadlocks.
+
+------------------------------------------------------------------------------
+What is a stored procedure, and why use one?
+Answer: A stored procedure is a saved SQL script that can be reused, which helps with performance, code organization, and security.
+
+------------------------------------------------------------------------------
+How would you handle time zone conversions in SQL?
+Answer: Use AT TIME ZONE or equivalent functions to convert between time zones.
+
+-----------------------------------------------------------------------------
+Explain the use of PARTITION BY and ORDER BY in window functions.
+Answer: PARTITION BY groups rows, and ORDER BY sets the order within each partition, crucial for calculations like ranking and cumulative sums
+
+----------------------------------------------------------------------------
+How do you measure query performance in SQL?
+Answer: Use execution plans, query runtime, index usage stats, and track CPU/memory usage.
+
+---------------------------------------------------------------------------
+What is a temp table, and when would you use it?
+Answer: Temporary tables store intermediate results, ideal for complex queries and session-specific data.
+
+--------------------------------------------------------------------------
+How would you handle schema changes in a production database?
+Answer: Test changes in a staging environment, backup data, use ALTER TABLE carefully, and communicate downtime if needed.
+
+-----------------------------------------------------------------------------
+What is a CTE, and how does it differ from a subquery?
+Answer: A CTE is a temporary result set within a query for better readability and reusability, while a subquery is a nested query directly within another query.
+
+----------------------------------------------------------------------------
+How would you identify customers who made a purchase last year but not this year?
+
+
+
+-- Adjust years as needed
+SELECT customer_id
+FROM Orders
+WHERE EXTRACT(YEAR FROM order_date) = 2024
+
+EXCEPT
+
+SELECT customer_id
+FROM Orders
+WHERE EXTRACT(YEAR FROM order_date) = 2025;
+
+or 
+
+SELECT DISTINCT customer_id
+FROM Orders
+WHERE EXTRACT(YEAR FROM order_date) = 2024
+  AND customer_id NOT IN (
+    SELECT DISTINCT customer_id
+    FROM Orders
+    WHERE EXTRACT(YEAR FROM order_date) = 2025
+);
+
+
+------------------------------------------------------------------------------
+Given a sales table, how do you find the top 3 sales representatives based on total sales?
+
+CREATE TABLE Sales14 (
+    sale_id INT,
+    rep_name VARCHAR(100),
+    sale_amount DECIMAL(10,2)
+);
+
+
+INSERT INTO Sales14 (sale_id, rep_name, sale_amount) VALUES
+(1, 'Alice', 1000.00),
+(2, 'Bob', 1500.00),
+(3, 'Alice', 2000.00),
+(4, 'Carol', 1800.00),
+(5, 'David', 1200.00),
+(6, 'Bob', 1700.00),
+(7, 'Eve', 900.00);
+
+
+WITH RankedSales AS (
+  SELECT rep_name,
+         SUM(sale_amount) AS total_sales,
+         RANK() OVER (ORDER BY SUM(sale_amount) DESC) AS sales_rank
+  FROM Sales14
+  GROUP BY rep_name
+)
+SELECT *
+FROM RankedSales
+WHERE sales_rank <= 3;
+
+
+-----------------------------------------------------------------------
+/*How would you find customers who’ve bought all products in a given product list?*/
+-- Customer purchases
+CREATE TABLE CustomerPurchases (
+    customer_id INT,
+    product_id INT
+);
+
+-- Target product list
+CREATE TABLE TargetProducts (
+    product_id INT
+);
+
+-- Purchases
+INSERT INTO CustomerPurchases VALUES
+(1, 101), (1, 102), (1, 103),
+(2, 101), (2, 102),
+(3, 101), (3, 102), (3, 103);
+
+-- Target product list
+INSERT INTO TargetProducts VALUES
+(101), (102), (103);
+
+SELECT customer_id
+FROM CustomerPurchases
+WHERE product_id IN (SELECT product_id FROM TargetProducts)
+GROUP BY customer_id
+HAVING COUNT(DISTINCT product_id) = (SELECT COUNT(*) FROM TargetProducts);
+
+------------------------------------------------------------------------------
+CREATE TABLE Attendance (
+    employee_id INT,
+    attendance_date DATE,
+    status VARCHAR(10)  -- 'Present' or 'Absent'
+);
+
+INSERT INTO Attendance VALUES
+(1, '2025-07-01', 'Present'),
+(1, '2025-07-02', 'Absent'),
+(1, '2025-07-03', 'Absent'),
+(1, '2025-07-04', 'Absent'),
+(1, '2025-07-05', 'Present'),
+(2, '2025-07-01', 'Absent'),
+(2, '2025-07-02', 'Absent'),
+(2, '2025-07-03', 'Present');
+
+
+/* How do you identify consecutive absences in attendance data?*/
+WITH AbsentDays AS (
+  SELECT *,
+         ROW_NUMBER() OVER (PARTITION BY employee_id ORDER BY attendance_date) 
+         - 
+         ROW_NUMBER() OVER (PARTITION BY employee_id, status ORDER BY attendance_date) 
+         AS grp
+  FROM Attendance
+  WHERE status = 'Absent'
+)
+SELECT 
+    employee_id,
+    MIN(attendance_date) AS absence_start,
+    MAX(attendance_date) AS absence_end,
+    COUNT(*) AS consecutive_days
+FROM AbsentDays
+GROUP BY employee_id, grp
+HAVING COUNT(*) >= 2  -- change this to detect 3+ or N+ day streaks
+ORDER BY employee_id, absence_start;
+
