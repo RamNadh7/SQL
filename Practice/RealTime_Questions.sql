@@ -1921,3 +1921,210 @@ GROUP BY employee_id, grp
 HAVING COUNT(*) >= 2  -- change this to detect 3+ or N+ day streaks
 ORDER BY employee_id, absence_start;
 
+
+--------------------------------------------------------------------------
+/*How would you calculate the percentage growth in sales month over month?*/
+
+CREATE TABLE MonthlySales (
+    month DATE,
+    sales DECIMAL(10,2)
+);
+
+INSERT INTO MonthlySales (month, sales) VALUES
+('2025-01-01', 100000.00),
+('2025-02-01', 120000.00),
+('2025-03-01', 110000.00),
+('2025-04-01', 130000.00),
+('2025-05-01', 125000.00),
+('2025-06-01', 140000.00);
+
+
+SELECT 
+    month,
+    sales,
+    LAG(sales) OVER (ORDER BY month) AS prev_month_sales,
+    ROUND(
+        (sales - LAG(sales) OVER (ORDER BY month)) 
+        / NULLIF(LAG(sales) OVER (ORDER BY month), 0) * 100, 2
+    ) AS mom_growth_percent
+FROM MonthlySales;
+
+
+-------------------------------------------------------------------------------
+-- Orders that have been shipped
+CREATE TABLE Shipments (
+    shipment_id INT,
+    order_id INT,
+    shipped_date DATE
+);
+
+-- Orders that have been billed
+CREATE TABLE Invoices1 (
+    invoice_id INT,
+    order_id INT,
+    billed_date DATE
+);
+
+INSERT INTO Shipments (shipment_id, order_id, shipped_date) VALUES
+(1, 1001, '2025-06-01'),
+(2, 1002, '2025-06-03'),
+(3, 1003, '2025-06-05'),
+(4, 1004, '2025-06-07'),
+(5, 1005, '2025-06-09'),
+(6, 1006, '2025-06-11');
+
+
+INSERT INTO Invoices1 (invoice_id, order_id, billed_date) VALUES
+(101, 1001, '2025-06-02'),
+(102, 1003, '2025-06-06'),
+(103, 1005, '2025-06-10');
+
+/*How can you identify orders that have been shipped but not yet billed?*/
+SELECT s.order_id, s.shipped_date
+FROM Shipments s
+LEFT JOIN Invoices1 i ON s.order_id = i.order_id
+WHERE i.invoice_id IS NULL;
+
+----------------------------------------------------------------------------
+CREATE TABLE Transactions (
+    transaction_id INT,
+    transaction_date DATE,
+    amount DECIMAL(10,2)
+);
+
+
+INSERT INTO Transactions VALUES
+(1, '2025-07-01', 100.00),
+(2, '2025-07-01', 150.00),
+(3, '2025-07-02', 200.00),
+(4, '2025-07-02', 50.00),
+(5, '2025-07-02', 300.00),
+(6, '2025-07-03', 120.00),
+(7, '2025-07-03', 80.00);
+
+/* Given transaction data, how would you find the day with the highest transactions?*/
+
+SELECT transaction_date, COUNT(*) AS transaction_count
+FROM Transactions
+GROUP BY transaction_date
+ORDER BY transaction_count DESC
+LIMIT 1;
+
+-----------------------------------------------------------------------------
+CREATE TABLE Employees5 (
+    emp_id INT,
+    emp_name VARCHAR(100),
+    department VARCHAR(50),
+    performance_score INT
+);
+
+INSERT INTO Employees5 VALUES
+(1, 'Alice', 'Sales', 85),
+(2, 'Bob', 'Sales', 92),
+(3, 'Carol', 'Sales', 85),
+(4, 'David', 'HR', 78),
+(5, 'Eve', 'HR', 88),
+(6, 'Frank', 'HR', 88),
+(7, 'Grace', 'IT', 95),
+(8, 'Heidi', 'IT', 90);
+
+/*How would you rank employees within departments based on their performance score?*/
+SELECT 
+    emp_id,
+    emp_name,
+    department,
+    performance_score,
+    Dense_RANK() OVER (
+        PARTITION BY department 
+        ORDER BY performance_score DESC
+    ) AS dept_rank
+FROM Employees5
+ORDER BY department, dept_rank;
+
+
+--------------------------------------------------------------------------
+CREATE TABLE Orders6 (
+    order_id INT,
+    customer_id INT,
+    order_date DATE
+);
+
+INSERT INTO Orders6 VALUES
+(1, 101, '2025-06-01'),
+(2, 102, '2025-06-02'),
+(3, 101, '2025-06-03'),
+(4, 103, '2025-06-04'),
+(5, 104, '2025-06-05'),
+(6, 104, '2025-06-06'),
+(7, 104, '2025-06-07'),
+(8, 105, '2025-06-08');
+
+/*How would you retrieve customers who placed exactly two orders?*/
+
+SELECT customer_id
+FROM Orders6
+GROUP BY customer_id
+HAVING COUNT(*) = 2;
+--------------------------------------------------------------------------
+/*How do you find the first purchase made by each customer?*/
+WITH RankedPurchases AS (
+  SELECT *,
+         ROW_NUMBER() OVER (
+           PARTITION BY customer_id 
+           ORDER BY purchase_date
+         ) AS rn
+  FROM Purchases
+)
+SELECT *
+FROM RankedPurchases
+WHERE rn = 1;
+
+
+----------------------------------------------------------------------------
+/*How do you identify orders with a price change compared to the previous order?*/
+CREATE TABLE Orders7 (
+    order_id INT,
+    customer_id INT,
+    order_date DATE,
+    price DECIMAL(10,2)
+);
+
+
+INSERT INTO Orders7 VALUES
+(1, 101, '2025-06-01', 100.00),
+(2, 101, '2025-06-05', 100.00),
+(3, 101, '2025-06-10', 120.00),
+(4, 102, '2025-06-02', 200.00),
+(5, 102, '2025-06-08', 180.00);
+
+SELECT *
+FROM (
+    SELECT 
+        order_id,
+        customer_id,
+        order_date,
+        price,
+        LAG(price) OVER (
+            PARTITION BY customer_id 
+            ORDER BY order_date
+        ) AS previous_price
+    FROM Orders7
+) AS sub
+WHERE price <> previous_price;
+
+-----------------------------------------------------------------------
+/*How would you find the average sales by month and year?*/
+SELECT 
+    EXTRACT(YEAR FROM sale_date) AS sale_year,
+    EXTRACT(MONTH FROM sale_date) AS sale_month,
+    round(AVG(amount),2) AS average_sales
+FROM Sales1
+GROUP BY 
+    EXTRACT(YEAR FROM sale_date),
+    EXTRACT(MONTH FROM sale_date)
+ORDER BY 
+    sale_year,
+    sale_month;
+
+
+----------------------------------------------------------------------------
