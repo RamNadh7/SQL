@@ -2128,3 +2128,768 @@ ORDER BY
 
 
 ----------------------------------------------------------------------------
+CREATE TABLE Orders8 (
+    order_id INT,
+    customer_id INT,
+    order_date DATE
+);
+
+INSERT INTO Orders8 (order_id, customer_id, order_date) VALUES
+-- Customer 101: Jan & Feb (consecutive)
+(1, 101, '2025-01-10'),
+(2, 101, '2025-02-15'),
+
+-- Customer 102: Feb & Apr (not consecutive)
+(3, 102, '2025-02-20'),
+(4, 102, '2025-04-05'),
+
+-- Customer 103: Mar only
+(5, 103, '2025-03-12'),
+
+-- Customer 104: Apr & May (consecutive)
+(6, 104, '2025-04-18'),
+(7, 104, '2025-05-02'),
+
+-- Customer 105: May & Jun (consecutive)
+(8, 105, '2025-05-25'),
+(9, 105, '2025-06-01'),
+
+-- Customer 106: Jan, Feb, Mar (multiple consecutive)
+(10, 106, '2025-01-05'),
+(11, 106, '2025-02-10'),
+(12, 106, '2025-03-15');
+
+
+/*How do you find customers who placed orders in two consecutive months?*/
+
+
+WITH MonthlyOrders AS (
+  SELECT DISTINCT 
+         customer_id,
+         DATE_TRUNC('month', order_date) AS order_month
+  FROM Orders8
+),
+RankedOrders AS (
+  SELECT customer_id,
+         order_month,
+         LAG(order_month) OVER (
+             PARTITION BY customer_id 
+             ORDER BY order_month
+         ) AS prev_month
+  FROM MonthlyOrders
+)
+SELECT DISTINCT customer_id
+FROM RankedOrders
+WHERE prev_month IS NOT NULL
+  AND order_month = prev_month + INTERVAL '1 month';
+
+
+------------------------------------------------------------------------------
+How would you get the running total of sales over time?
+
+SELECT 
+    sale_date,
+    amount,
+    SUM(amount) OVER (
+        ORDER BY sale_date
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS running_total
+FROM Sales1;
+
+------------------------------------------------------------------------------
+/*How would you handle a situation where you need to delete duplicate records, keeping only the latest entry?*/
+
+WITH RankedUsers AS (
+  SELECT *,
+         ROW_NUMBER() OVER (
+           PARTITION BY email
+           ORDER BY updated_at DESC
+         ) AS rn
+  FROM Users
+)
+DELETE FROM Users
+WHERE id IN (
+  SELECT id
+  FROM RankedUsers
+  WHERE rn > 1
+);
+or 
+
+DELETE FROM Users
+WHERE id NOT IN (
+  SELECT MAX(id)
+  FROM Users
+  GROUP BY email
+);
+ ----------------------------------------------------------------------------
+
+ CREATE TABLE Events (
+    event_id INT,
+    event_name VARCHAR(100),
+    start_time TIMESTAMP,
+    end_time TIMESTAMP
+);
+
+INSERT INTO Events (event_id, event_name, start_time, end_time) VALUES
+(1, 'Login Session', '2025-07-05 08:00:00', '2025-07-05 10:15:00'),
+(2, 'System Backup', '2025-07-05 01:30:00', '2025-07-05 03:00:00'),
+(3, 'Data Sync', '2025-07-04 22:00:00', '2025-07-05 00:45:00'),
+(4, 'Report Generation', '2025-07-05 09:00:00', '2025-07-05 09:45:00');
+
+/* How do you calculate the time difference between two timestamps in SQL? */
+SELECT 
+    event_id,
+    event_name,
+    start_time,
+    end_time,
+    end_time - start_time AS duration,
+    EXTRACT(EPOCH FROM end_time - start_time) / 60 AS duration_minutes
+FROM Events;
+
+select end_time - start_time from events;
+
+select start_time - end_time from events;
+
+------------------------------------------------------------------------------
+/*How would you retrieve products with the same price across multiple orders?*/
+
+SELECT product_id, price
+FROM orders2
+GROUP BY product_id, price
+HAVING COUNT(DISTINCT order_id) > 1;
+
+----------------------------------------------------------------------------
+How do you find all orders placed in the last 7 days?
+
+SELECT *
+FROM Orders
+WHERE order_date >= CURRENT_DATE - INTERVAL '7 days';
+
+----------------------------------------------------------------------------
+How would you retrieve the order with the maximum amount for each customer?
+
+WITH RankedOrders AS (
+  SELECT *,
+         RANK() OVER (
+           PARTITION BY customer_id 
+           ORDER BY amount DESC
+         ) AS rnk
+  FROM Orders
+)
+SELECT order_id, customer_id, order_date, amount
+FROM RankedOrders
+WHERE rnk = 1;
+
+
+-----------------------------------------------------------------------------
+/* Copy Rights Reserved How do you calculate monthly retention rates for customers?*/
+
+CREATE TABLE customer_activity (
+    customer_id INT,
+    activity_date DATE
+);
+
+INSERT INTO customer_activity VALUES
+(1, '2025-01-10'), (1, '2025-02-15'), (1, '2025-03-01'),
+(2, '2025-01-12'),
+(3, '2025-02-05'), (3, '2025-03-10'),
+(4, '2025-02-20'),
+(5, '2025-03-05'), (5, '2025-04-01');
+
+
+WITH cohort AS (
+  SELECT 
+    customer_id,
+    DATE_TRUNC('month', MIN(activity_date)) AS cohort_month
+  FROM customer_activity
+  GROUP BY customer_id
+),
+activity_by_month AS (
+  SELECT 
+    customer_id,
+    DATE_TRUNC('month', activity_date) AS activity_month
+  FROM customer_activity
+),
+cohort_activity AS (
+  SELECT 
+    c.cohort_month,
+    a.activity_month,
+    a.customer_id
+  FROM cohort c
+  JOIN activity_by_month a ON c.customer_id = a.customer_id
+)
+SELECT 
+  cohort_month,
+  activity_month,
+  COUNT(DISTINCT customer_id) AS retained_customers
+FROM cohort_activity
+GROUP BY cohort_month, activity_month
+ORDER BY cohort_month, activity_month;
+
+or
+
+SELECT 
+    a.month AS retained_in_month,
+    COUNT(DISTINCT a.customer_id) AS retained_customers
+FROM customers a
+JOIN customers b
+  ON a.customer_id = b.customer_id
+ AND b.month = a.month + INTERVAL '1 month'
+GROUP BY a.month
+ORDER BY a.month;
+
+---------------------------------------------------------------------------
+/*How would you identify the best-selling product each month?*/
+
+CREATE TABLE OrderDetails (
+    order_id INT,
+    product_id INT,
+    order_date DATE,
+    quantity INT
+);
+
+INSERT INTO OrderDetails VALUES
+(1, 101, '2025-01-05', 5),
+(2, 102, '2025-01-10', 3),
+(3, 101, '2025-01-15', 2),
+(4, 103, '2025-02-01', 7),
+(5, 101, '2025-02-10', 4),
+(6, 102, '2025-02-20', 6),
+(7, 103, '2025-02-25', 3);
+
+WITH MonthlySales AS (
+  SELECT 
+    DATE_TRUNC('month', order_date) AS sale_month,
+    product_id,
+    SUM(quantity) AS total_quantity
+  FROM OrderDetails
+  GROUP BY sale_month, product_id
+),
+RankedSales AS (
+  SELECT *,
+         RANK() OVER (
+           PARTITION BY sale_month 
+           ORDER BY total_quantity DESC
+         ) AS rank
+  FROM MonthlySales
+)
+SELECT sale_month, product_id, total_quantity
+FROM RankedSales
+WHERE rank = 1
+ORDER BY sale_month;
+
+----------------------------------------------------------------------------
+/*How do you handle a case where you need to split data between weekends and weekdays?*/
+
+SELECT 
+  CASE 
+    WHEN EXTRACT(DOW FROM sale_date) IN (0, 6) THEN 'Weekend'
+    ELSE 'Weekday'
+  END AS day_type,
+  COUNT(*) AS total_sales,
+  SUM(amount) AS total_amount
+FROM Sales15
+GROUP BY day_type;
+
+---------------------------------------------------------------------------
+/*How do you calculate the difference in sales between two periods?*/
+
+WITH sales_by_month AS (
+  SELECT 
+    DATE_TRUNC('month', sale_date) AS month,
+    SUM(amount) AS total_sales
+  FROM Sales
+  GROUP BY month
+),
+ranked_sales AS (
+  SELECT *,
+         LAG(total_sales) OVER (ORDER BY month) AS previous_sales
+  FROM sales_by_month
+)
+SELECT 
+  month,
+  total_sales,
+  previous_sales,
+  total_sales - previous_sales AS sales_diff,
+  ROUND((total_sales - previous_sales) * 100.0 / previous_sales, 2) AS percent_change
+FROM ranked_sales;
+
+-------------------------------------------------------------------------------
+/*How would you calculate a cohort retention rate?*/
+
+SELECT cohort, COUNT(DISTINCT
+retained_customers.customer_id) / COUNT(DISTINCT
+initial_customers.customer_id) AS retention_rate
+FROM customers initial_customers
+LEFT JOIN customers retained_customers ON
+initial_customers.customer_id =
+retained_customers.customer_id;
+
+----------------------------------------------------------------------------
+/*How would you identify customers who haven’t purchased in over 6 months?*/
+
+CREATE TABLE Purchases1 (
+    customer_id INT,
+    purchase_date DATE
+);
+
+INSERT INTO Purchases1 VALUES
+(1, '2025-01-10'),
+(2, '2025-06-01'),
+(3, '2024-12-15'),
+(4, '2025-02-20'),
+(5, '2025-07-01');  -- recent purchase
+
+
+WITH LastPurchase AS (
+  SELECT 
+    customer_id,
+    MAX(purchase_date) AS last_purchase
+  FROM Purchases1
+  GROUP BY customer_id
+)
+SELECT customer_id, last_purchase
+FROM LastPurchase
+WHERE last_purchase < CURRENT_DATE - INTERVAL '6 months';
+
+------------------------------------------------------------------------------
+/*How would you find employees who joined within the last quarter?*/
+
+SELECT *
+FROM employees
+WHERE joining_date >= DATE_TRUNC('quarter', CURRENT_DATE);
+
+SELECT 
+  employee_id,
+  employee_name,
+  joining_date,
+  DATE_TRUNC('quarter', joining_date) AS joined_quarter
+FROM employees
+WHERE joining_date >= DATE_TRUNC('quarter', CURRENT_DATE);
+
+
+---------------------------------------------------------------------------
+/*How do you retrieve the last three months’ average sales per day?*/
+WITH recent_sales AS (
+  SELECT *
+  FROM Sales
+  WHERE sale_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '3 months'
+)
+SELECT 
+  ROUND(SUM(amount) / COUNT(DISTINCT sale_date), 2) AS avg_sales_per_day
+FROM recent_sales;
+
+----------------------------------------------------------------------
+---How do you select all employees with higher salaries than their department average?
+SELECT e.employee_id, e.name, e.department_id, e.salary
+FROM employees e
+JOIN (
+  SELECT department_id, AVG(salary) AS avg_salary
+  FROM employees
+  GROUP BY department_id
+) d ON e.department_id = d.department_id
+WHERE e.salary > d.avg_salary;
+
+
+----------------------------------------------------------------------------
+---- How would you identify users who placed their last order in December last year?
+WITH LastOrders AS (
+  SELECT 
+    customer_id,
+    MAX(order_date) AS last_order_date
+  FROM Orders
+  GROUP BY customer_id
+)
+SELECT customer_id, last_order_date
+FROM LastOrders
+WHERE EXTRACT(YEAR FROM last_order_date) = EXTRACT(YEAR FROM CURRENT_DATE) - 1
+  AND EXTRACT(MONTH FROM last_order_date) = 12;
+
+
+-------------------------------------------------------------------------
+---- How do you retrieve products with the second-highest sales for each category?
+
+WITH ProductSales AS (
+  SELECT 
+    p.category,
+    p.product_id,
+    p.product_name,
+    SUM(s.quantity) AS total_quantity
+  FROM Products p
+  JOIN Sales s ON p.product_id = s.product_id
+  GROUP BY p.category, p.product_id, p.product_name
+),
+RankedSales AS (
+  SELECT *,
+         RANK() OVER (
+           PARTITION BY category 
+           ORDER BY total_quantity DESC
+         ) AS sales_rank
+  FROM ProductSales
+)
+SELECT category, product_name, total_quantity
+FROM RankedSales
+WHERE sales_rank = 2;
+
+
+-------------------------------------------------------------------------
+---- How would you find the average order amount for the top 10% of orders?
+WITH OrderAmounts AS (
+  SELECT order_id, amount
+  FROM Orders
+),
+Threshold AS (
+  SELECT PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY amount) AS cutoff
+  FROM OrderAmounts
+)
+SELECT ROUND(AVG(amount), 2) AS avg_top_10_percent
+FROM OrderAmounts, Threshold
+WHERE amount >= Threshold.cutoff;
+
+--------------------------------------------------------------------------
+--- How do you find orders that took longer than the average processing time?
+
+WITH ProcessingTimes AS (
+  SELECT 
+    order_id,
+    order_date,
+    shipped_date,
+    (shipped_date - order_date) AS processing_days
+  FROM Orders
+),
+AverageTime AS (
+  SELECT AVG(processing_days) AS avg_days
+  FROM ProcessingTimes
+)
+SELECT pt.*
+FROM ProcessingTimes pt, AverageTime at
+WHERE pt.processing_days > at.avg_days;
+
+
+-------------------------------------------------------------------------
+--- How would you find customers with both high purchase frequency and high average order value?
+
+WITH CustomerStats AS (
+  SELECT 
+    customer_id,
+    COUNT(*) AS total_orders,
+    AVG(amount) AS avg_order_value
+  FROM Orders
+  GROUP BY customer_id
+)
+SELECT *
+FROM CustomerStats
+WHERE total_orders > (
+    SELECT PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY total_orders)
+    FROM CustomerStats
+)
+AND avg_order_value > (
+    SELECT PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY avg_order_value)
+    FROM CustomerStats
+);
+
+
+----------------------------------------------------------------------------
+----How do you get the last three months' revenue and average revenue per month?
+WITH recent_sales AS (
+  SELECT 
+    DATE_TRUNC('month', sale_date) AS sale_month,
+    SUM(amount) AS monthly_revenue
+  FROM Sales
+  WHERE sale_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '3 months'
+  GROUP BY sale_month
+)
+SELECT 
+  SUM(monthly_revenue) AS total_revenue_last_3_months,
+  ROUND(AVG(monthly_revenue), 2) AS avg_revenue_per_month
+FROM recent_sales;
+
+
+--------------------------------------------------------------------------------
+------ How would you retrieve customers who’ve never made a purchase?
+SELECT c.customer_id, c.name
+FROM Customers c
+LEFT JOIN Orders o ON c.customer_id = o.customer_id
+WHERE o.customer_id IS NULL;
+
+
+---------------------------------------------------------------------------
+--- How would you check for salary discrepancies between employees in the same role?
+
+SELECT 
+  job_title,
+  MIN(salary) AS min_salary,
+  MAX(salary) AS max_salary,
+  ROUND(AVG(salary), 2) AS avg_salary,
+  COUNT(*) AS employee_count
+FROM employees
+GROUP BY job_title
+HAVING MAX(salary) - MIN(salary) > 0;
+
+
+SELECT 
+  job_title,
+  employee_id,
+  employee_name,
+  salary,
+  ROUND(AVG(salary) OVER (PARTITION BY job_title), 2) AS avg_role_salary,
+  salary - AVG(salary) OVER (PARTITION BY job_title) AS salary_diff
+FROM employees
+ORDER BY job_title, salary_diff DESC;
+
+
+--------------------------------------------------------------------------
+--- How do you calculate the average time between two events in an event log?
+WITH ordered_events AS (
+  SELECT 
+    user_id,
+    event_time,
+    LEAD(event_time) OVER (
+      PARTITION BY user_id 
+      ORDER BY event_time
+    ) AS next_event_time
+  FROM event_log
+),
+event_deltas AS (
+  SELECT 
+    user_id,
+    event_time,
+    next_event_time,
+    EXTRACT(EPOCH FROM next_event_time - event_time) AS seconds_between
+  FROM ordered_events
+  WHERE next_event_time IS NOT NULL
+)
+SELECT 
+  user_id,
+  ROUND(AVG(seconds_between), 2) AS avg_seconds_between_events
+FROM event_deltas
+GROUP BY user_id;
+
+
+-----------------------------------------------------------------------------
+---How would you find products that haven’t been sold in the last six months?
+SELECT p.product_id, p.product_name
+FROM Products p
+LEFT JOIN Sales s 
+  ON p.product_id = s.product_id 
+  AND s.sale_date >= CURRENT_DATE - INTERVAL '6 months'
+WHERE s.product_id IS NULL;
+
+
+------------------------------------------------------------------------
+---- How would you retrieve the highest daily sales for each month?
+
+WITH daily_totals AS (
+  SELECT 
+    DATE_TRUNC('day', sale_date) AS sale_day,
+    DATE_TRUNC('month', sale_date) AS sale_month,
+    SUM(amount) AS daily_total
+  FROM Sales
+  GROUP BY sale_day, sale_month
+),
+ranked_days AS (
+  SELECT *,
+         RANK() OVER (
+           PARTITION BY sale_month 
+           ORDER BY daily_total DESC
+         ) AS rank
+  FROM daily_totals
+)
+SELECT sale_month, sale_day, daily_total
+FROM ranked_days
+WHERE rank = 1
+ORDER BY sale_month;
+
+
+------------------------------------------------------------------------
+--- How do you rank products within each category by total revenue?
+
+WITH ProductRevenue AS (
+  SELECT 
+    p.category,
+    p.product_id,
+    p.product_name,
+    SUM(s.amount) AS total_revenue
+  FROM Products p
+  JOIN Sales s ON p.product_id = s.product_id
+  GROUP BY p.category, p.product_id, p.product_name
+),
+RankedProducts AS (
+  SELECT *,
+         RANK() OVER (
+           PARTITION BY category 
+           ORDER BY total_revenue DESC
+         ) AS revenue_rank
+  FROM ProductRevenue
+)
+SELECT category, product_name, total_revenue, revenue_rank
+FROM RankedProducts
+ORDER BY category, revenue_rank;
+
+
+-------------------------------------------------------------------------
+---How would you handle outliers in a dataset for sales orders?
+
+WITH stats AS (
+  SELECT 
+    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY amount) AS q1,
+    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY amount) AS q3
+  FROM Sales
+)
+SELECT *
+FROM Sales, stats
+WHERE amount < q1 - 1.5 * (q3 - q1)
+   OR amount > q3 + 1.5 * (q3 - q1);
+
+---------------------------------------------------------------------------
+/* How would you find customers whose total spending is within the top 20% of all customers? */
+
+WITH CustomerSpend AS (
+  SELECT 
+    customer_id,
+    SUM(amount) AS total_spent
+  FROM Orders
+  GROUP BY customer_id
+),
+Threshold AS (
+  SELECT 
+    PERCENTILE_CONT(0.8) WITHIN GROUP (ORDER BY total_spent) AS cutoff
+  FROM CustomerSpend
+)
+SELECT cs.customer_id, cs.total_spent
+FROM CustomerSpend cs, Threshold t
+WHERE cs.total_spent >= t.cutoff;
+
+-----------------------------------------------------------------------
+--- How do you select all orders with their most recent status?
+WITH RankedStatus AS (
+  SELECT 
+    order_id,
+    status,
+    status_date,
+    ROW_NUMBER() OVER (
+      PARTITION BY order_id 
+      ORDER BY status_date DESC
+    ) AS rn
+  FROM OrderStatus
+)
+SELECT o.order_id, o.customer_id, rs.status, rs.status_date
+FROM Orders o
+JOIN RankedStatus rs ON o.order_id = rs.order_id
+WHERE rs.rn = 1;
+
+
+--------------------------------------------------------------------------
+--- How would you identify customers with irregular ordering patterns (e.g., high variance in order frequency)?
+
+WITH ordered_events AS (
+  SELECT 
+    customer_id,
+    order_date,
+    LAG(order_date) OVER (
+      PARTITION BY customer_id 
+      ORDER BY order_date
+    ) AS previous_order
+  FROM Orders
+),
+order_gaps AS (
+  SELECT 
+    customer_id,
+    EXTRACT(DAY FROM order_date - previous_order) AS gap_days
+  FROM ordered_events
+  WHERE previous_order IS NOT NULL
+)
+SELECT 
+  customer_id,
+  COUNT(*) AS num_gaps,
+  ROUND(AVG(gap_days), 2) AS avg_gap,
+  ROUND(STDDEV(gap_days), 2) AS stddev_gap,
+  ROUND(STDDEV(gap_days) / NULLIF(AVG(gap_days), 0), 2) AS coeff_variation
+FROM order_gaps
+GROUP BY customer_id
+ORDER BY coeff_variation DESC NULLS LAST;
+
+----------------------------------------------------------------------------
+-- How do you retrieve customers who haven’t ordered in the current year but did in previous years?
+
+WITH previous_orders AS (
+  SELECT DISTINCT customer_id
+  FROM Orders
+  WHERE EXTRACT(YEAR FROM order_date) < EXTRACT(YEAR FROM CURRENT_DATE)
+),
+current_year_orders AS (
+  SELECT DISTINCT customer_id
+  FROM Orders
+  WHERE EXTRACT(YEAR FROM order_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+)
+SELECT c.customer_id, c.name
+FROM Customers c
+JOIN previous_orders p ON c.customer_id = p.customer_id
+WHERE c.customer_id NOT IN (
+  SELECT customer_id FROM current_year_orders
+);
+
+
+----------------------------------------------------------------------
+--- How would you calculate the month-over-month growth rate in SQL?
+
+WITH monthly_revenue AS (
+  SELECT 
+    DATE_TRUNC('month', sale_date) AS month,
+    SUM(amount) AS total_revenue
+  FROM Sales
+  GROUP BY month
+),
+growth_calc AS (
+  SELECT 
+    month,
+    total_revenue,
+    LAG(total_revenue) OVER (ORDER BY month) AS prev_month_revenue
+  FROM monthly_revenue
+)
+SELECT 
+  month,
+  total_revenue,
+  prev_month_revenue,
+  ROUND(
+    CASE 
+      WHEN prev_month_revenue = 0 THEN NULL
+      ELSE (total_revenue - prev_month_revenue) * 100.0 / prev_month_revenue
+    END, 2
+  ) AS mom_growth_percent
+FROM growth_calc
+ORDER BY month;
+
+
+------------------------------------------------------------------------
+--- How do you identify products that have been ordered together frequently?
+
+SELECT 
+  oi1.product_id AS product_a,
+  oi2.product_id AS product_b,
+  COUNT(DISTINCT oi1.order_id) AS times_ordered_together
+FROM OrderItems oi1
+JOIN OrderItems oi2 
+  ON oi1.order_id = oi2.order_id 
+  AND oi1.product_id < oi2.product_id
+GROUP BY product_a, product_b
+ORDER BY times_ordered_together DESC;
+
+
+---------------------------------------------------------------------------
+---- How would you find the most popular time slots for orders in a day?
+
+SELECT 
+  CASE 
+    WHEN EXTRACT(HOUR FROM order_time) BETWEEN 6 AND 11 THEN 'Morning'
+    WHEN EXTRACT(HOUR FROM order_time) BETWEEN 12 AND 16 THEN 'Afternoon'
+    WHEN EXTRACT(HOUR FROM order_time) BETWEEN 17 AND 21 THEN 'Evening'
+    ELSE 'Night'
+  END AS time_slot,
+  COUNT(*) AS order_count
+FROM Orders
+GROUP BY time_slot
+ORDER BY order_count DESC;
+
+
+--------------------------------------------------------------------------
