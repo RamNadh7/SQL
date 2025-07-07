@@ -92,8 +92,7 @@ INSERT INTO Sales (sale_id, product_id, sale_date, sales) VALUES
 
 /*
 Window Functions in Analytical Queries 
-Question: For each product sold, calculate the running total of 
-the number of sales made over time, ordered by sale date.
+Question: For each product sold, calculate the running total of the number of sales made over time, ordered by sale date.
 */
 SELECT product_id, sale_date, sales, 
        SUM(sales) OVER (PARTITION BY product_id ORDER BY 
@@ -116,28 +115,32 @@ INSERT INTO Service_Requests (request_id, created_at, resolved_at) VALUES
 (5, '2024-12-05 13:00:00', '2024-12-06 16:00:00'); -- weekday
 
 /*
- You are given a table Service_Requests with columns 
-request_id, created_at, and resolved_at. Write a query to 
-calculate the average time taken to resolve a request (in 
-hours), excluding weekends. 
+ You are given a table Service_Requests with columns request_id, created_at, and resolved_at. Write a query to calculate the average time taken to resolve a request (in hours), excluding weekends. 
 */
 
-WITH request_hours AS (
+
+WITH all_hours AS (
   SELECT 
     request_id,
-    created_at,
-    resolved_at,
-    EXTRACT(EPOCH FROM (resolved_at - created_at))/3600 AS total_hours,
-    EXTRACT(DOW FROM created_at) AS start_dow
+    generate_series(
+      created_at,
+      resolved_at,
+      interval '1 hour'
+    ) AS hourly_tick
   FROM Service_Requests
-  WHERE EXTRACT(DOW FROM created_at) BETWEEN 1 AND 5 -- exclude Sat (6) & Sun (0)
+),
+filtered_hours AS (
+  SELECT 
+    request_id,
+    hourly_tick
+  FROM all_hours
+  WHERE EXTRACT(DOW FROM hourly_tick) BETWEEN 1 AND 5 -- Mon to Fri
 )
-SELECT ROUND(AVG(total_hours), 2) AS avg_resolution_time_hours
-FROM request_hours;
+SELECT * FROM filtered_hours;
+  ROUND(COUNT(*)::numeric / COUNT(DISTINCT request_id), 2) AS avg_resolution_time_hours
+FROM filtered_hours;
 
-
-
--------------------------------correct_solution
+-------------------------------alternate solution
 
 
 WITH WeekdayHours AS (
