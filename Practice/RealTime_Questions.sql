@@ -513,8 +513,7 @@ SELECT * FROM Hierarchy;
 
 ---------------------------------------------------------------
 /*
-Explain how partitioning works in SQL and provide 
-an example of partitioning a table by date. 
+Explain how partitioning works in SQL and provide an example of partitioning a table by date. 
 */
 CREATE TABLE Sales4 (
     sale_id INT,
