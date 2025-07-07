@@ -136,11 +136,10 @@ filtered_hours AS (
   FROM all_hours
   WHERE EXTRACT(DOW FROM hourly_tick) BETWEEN 1 AND 5 -- Mon to Fri
 )
-SELECT * FROM filtered_hours;
   ROUND(COUNT(*)::numeric / COUNT(DISTINCT request_id), 2) AS avg_resolution_time_hours
 FROM filtered_hours;
 
--------------------------------alternate solution
+-------------------------------alternate solution -------------------------------------------
 
 
 WITH WeekdayHours AS (
@@ -207,9 +206,7 @@ INSERT INTO Purchases (purchase_id, customer_id, purchase_date, amount) VALUES
 (12, 3, CURRENT_DATE - INTERVAL '50 days', 120.00);
 
 /*
- Given a Purchases table, find customers who have 
-made more than 5 purchases in the last 6 months, along with 
-their total spend.
+ Given a Purchases table, find customers who have made more than 5 purchases in the last 6 months, along with their total spend.
 */
 SELECT customer_id, COUNT(*) AS purchase_count, 
 SUM(amount) AS total_spent FROM Purchases 
@@ -248,8 +245,7 @@ INSERT INTO Student_Grades VALUES
 (4, 103, 'B'); -- Student 4: missing Math
 
 /*
-You have a table of student grades. Write a query to 
-find students who do not have grades for all subjects.
+You have a table of student grades. Write a query to find students who do not have grades for all subjects.
 */
 
 SELECT student_id 
@@ -291,6 +287,23 @@ GROUP BY employee_id
 ORDER BY total_sales DESC
 LIMIT 3;
 
+----------------------------------------------------------
+WITH yr_sale AS (
+  SELECT employee_id, SUM(amount) AS total_sales
+  FROM Sales1
+  WHERE sale_date >= CURRENT_DATE - INTERVAL '1 year'
+  GROUP BY employee_id
+),
+ranked_sales AS (
+  SELECT 
+    employee_id,
+    total_sales,
+    DENSE_RANK() OVER (ORDER BY total_sales DESC) AS rnk
+  FROM yr_sale
+)
+SELECT employee_id, total_sales, rnk
+FROM ranked_sales
+WHERE rnk <= 3;
 
 --------------------------------------------------------------------------
 CREATE TABLE Sales2 (
@@ -360,7 +373,7 @@ INSERT INTO Orders1 (order_id, customer_id, order_date, delivery_date) VALUES
 Write a query to find the average time taken between order creation and delivery. 
 */
 SELECT 
-    ROUND(AVG(EXTRACT(EPOCH FROM delivery_date - order_date) / 3600), 2) AS avg_delivery_time_hours
+ROUND(AVG(EXTRACT(EPOCH FROM delivery_date - order_date) / 3600), 2) AS avg_delivery_time_hours
 FROM Orders1;
 
 
