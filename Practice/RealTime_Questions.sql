@@ -2908,3 +2908,42 @@ ORDER BY order_count DESC;
 
 
 --------------------------------------------------------------------------
+CREATE TABLE NUM (
+    SN INT,
+    NUMB INT
+);
+
+-- Step 2: Insert sample data
+INSERT INTO NUM (SN, NUMB) VALUES
+(1, 4),
+(2, 7),
+(3, 4),
+(4, 9),
+(5, 9),
+(6, 7),
+(7, 9),
+(8, 4);
+
+select a.numb from num a
+join num b on a.sn+1=b.sn
+join num c on a.sn+2=c.sn
+where a.numb=c.numb
+and a.numb<>b.numb;
+
+
+-----------------------------------------------------------------------------------------------
+-- Create the table
+CREATE TABLE teams (
+    team_name VARCHAR(50) NOT NULL
+);
+
+-- Insert team names
+INSERT INTO teams (team_name) VALUES 
+('CSK'),
+('KKR'),
+('GT'),
+('DC'),
+('LSG');
+
+select concat(t1.team_name, ' vs ' ,t2.team_name) from teams t1
+join teams t2 on t1.team_name < t2.team_name order by t1.team_name;
