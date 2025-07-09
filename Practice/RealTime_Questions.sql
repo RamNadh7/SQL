@@ -2947,3 +2947,59 @@ INSERT INTO teams (team_name) VALUES
 
 select concat(t1.team_name, ' vs ' ,t2.team_name) from teams t1
 join teams t2 on t1.team_name < t2.team_name order by t1.team_name;
+
+
+-------------------------------------------------------------------------------------------------------------------
+CREATE TABLE credit_card_issuance (
+    card_name VARCHAR(50) NOT NULL,
+    issued_amount INT NOT NULL,
+    issue_month INT NOT NULL CHECK (issue_month BETWEEN 1 AND 12),
+    issue_year INT NOT NULL,
+    PRIMARY KEY (card_name, issue_month, issue_year)
+);
+
+-- Insert the data
+INSERT INTO credit_card_issuance (card_name, issued_amount, issue_month, issue_year) VALUES
+('Chase Freedom Flex', 55000, 1, 2021),
+('Chase Freedom Flex', 60000, 2, 2021),
+('Chase Freedom Flex', 65000, 3, 2021),
+('Chase Freedom Flex', 70000, 4, 2021),
+('Chase Sapphire Reserve', 170000, 1, 2021),
+('Chase Sapphire Reserve', 175000, 2, 2021),
+('Chase Sapphire Reserve', 180000, 3, 2021);
+
+select card_name,
+max(issued_amount) - min(issued_amount) as amount_diff
+from credit_card_issuance
+group by card_name
+order by amount_diff DESC;
+
+------------------------------------------------------------------------------------------------------------
+-- Create the table
+CREATE TABLE transactions_avg (
+    transaction_id INT PRIMARY KEY,
+    user_id INT NOT NULL,
+    transaction_date DATE NOT NULL,
+    transaction_amount DECIMAL(10, 2) NOT NULL
+);
+
+-- Insert the data into the table
+INSERT INTO transactions_avg (transaction_id, user_id, transaction_date, transaction_amount)
+VALUES
+    (1, 269, '2018-08-15', 500),
+    (2, 478, '2018-11-25', 400),
+    (3, 269, '2019-01-05', 1000),
+    (4, 123, '2020-10-20', 600),
+    (5, 478, '2021-07-05', 700),
+    (6, 123, '2022-03-05', 900);
+
+---Write a SQL query to calculate the average transaction amount per year for each client, where the years are in the range of 2018 to 2022.
+
+select 
+      extract(year from transaction_date) as yr,
+      user_id,
+      round(avg(transaction_amount),2)
+      from transactions_avg
+      where extract(year from transaction_date) BETWEEN 2018 and 2022
+      group by user_id, yr
+      order by yr;
