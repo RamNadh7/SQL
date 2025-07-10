@@ -3003,3 +3003,39 @@ select
       where extract(year from transaction_date) BETWEEN 2018 and 2022
       group by user_id, yr
       order by yr;
+
+------------------------------------------------------------------------------------------------------------------------
+CREATE TABLE Transactions_com (
+    transaction_id INT PRIMARY KEY,
+    company_id INT,
+    transaction_date DATE,
+    revenue DECIMAL(10, 2)
+);
+INSERT INTO Transactions_com (transaction_id, company_id, transaction_date, revenue) VALUES
+(101, 1, '2020-01-15', 5000.00),
+(102, 2, '2020-01-20', 8500.00),
+(103, 1, '2020-02-10', 4500.00),
+(104, 3, '2020-02-20', 9900.00),
+(105, 2, '2020-02-25', 7500.00);
+
+CREATE TABLE Sectors (
+    company_id INT PRIMARY KEY,
+    sector VARCHAR(50)
+);
+INSERT INTO Sectors (company_id, sector) VALUES
+(1, 'Technology'),
+(2, 'Healthcare'),
+(3, 'Technology');
+
+----The output should show the average revenue for each sector for every month,allowing the company to see how each sector performed financially month by month
+select extract(month from transaction_date) as month,
+s.sector,
+avg(revenue) as avg_revenue
+from transactions_com tc
+inner join sectors s
+on tc.company_id=s.company_id
+group by month,s.sector
+order by month,avg_revenue;
+
+
+---------------------------------------------------------------------------------------------------------------
